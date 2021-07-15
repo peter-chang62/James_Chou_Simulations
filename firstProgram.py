@@ -85,6 +85,10 @@ def get_pulse_data(plot=False):
     return pulse_from_T, pulse_from_W
 
 
+def simulate(pulse, fiber, length):
+    pass
+
+
 pulse_from_T, pulse_from_W = get_pulse_data()
 
 """Now let's simulate! The goal is to get an estimate of how much fiber we 
@@ -140,9 +144,14 @@ fiber_pm1550.generate_fiber(.2,
                             gain=dBkm_to_m(pm1550["Alpha"]),
                             dispersion_format="D")
 
-# go through pm1550 first
+# initialize a simulation instance
 ssfm = fpn.FiberFourWaveMixing()
-pulse_from_W.set_epp(2.e-9)
+
+# set the pulse energy
+pulse_from_W.set_epp(20.e-9)
+ind = np.nonzero(pulse_from_W.wl_um > 0)
+
+# go through pm1550 first
 fiber_pm1550.length = 0.2
 res = ssfm.propagate(pulse_from_W, fiber_pm1550, 100)
 
@@ -155,11 +164,13 @@ res2 = ssfm.propagate(pulse_out, fiber2, 100)
 # plot the evolution in pm1550
 evolv = fpn.get_2d_evolv(res.AW)
 plt.figure()
-plt.pcolormesh(pulse_from_W.wl_nm * 1e-3, res.zs, evolv, shading='auto')
+plt.pcolormesh(pulse_from_W.wl_nm[ind] * 1e-3, res.zs, evolv[:, ind][:, 0, :],
+               shading='auto')
 plt.xlim(1, 2)
 
 # plot the evolution in hnlf
 evolv = fpn.get_2d_evolv(res2.AW)
 plt.figure()
-plt.pcolormesh(pulse_from_W.wl_nm * 1e-3, res2.zs, evolv, shading='auto')
+plt.pcolormesh(pulse_from_W.wl_nm[ind] * 1e-3, res2.zs, evolv[:, ind][:, 0, :],
+               shading='auto')
 plt.xlim(1, 2)
