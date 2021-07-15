@@ -1,3 +1,8 @@
+"""
+Returning to simulation for James Chou and Yu Liu
+"""
+import copy
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 import pynlo_peter.Fiber_PPLN_NLSE as fpn
@@ -10,11 +15,13 @@ clipboard_and_style_sheet.style_sheet()
 normalize = lambda vec: vec / np.max(abs(vec))
 
 
+# dB/km to 1/m
 def dBkm_to_m(dBkm):
     km = 10 ** (-dBkm / 10)
     return km * 1e-3
 
 
+# amplitude and phase data from Toptica
 def get_pulse_data(plot=False):
     pulse_data = np.genfromtxt("210526_2.0W_pulse.txt", skip_header=1)
     T_ps = pulse_data[:, 0]
@@ -85,18 +92,103 @@ def get_pulse_data(plot=False):
     return pulse_from_T, pulse_from_W
 
 
-def simulate(pulse, fiber, length):
-    pass
+def simulate(pulse, fiber, length_cm, epp_nJ, nsteps=100):
+    pulse: fpn.Pulse
+    fiber: fpn.Fiber
+    _ = copy.deepcopy(fiber)
+    _.length = length_cm * .01
+    __ = copy.deepcopy(pulse)
+    __.set_epp(epp_nJ * 1.e-9)
+    return fpn.FiberFourWaveMixing().propagate(__, _, nsteps)
 
 
+def get_2d_time_evolv(at2d):
+    norm = np.max(abs(at2d) ** 2, axis=1)
+    toplot = abs(at2d) ** 2
+    toplot = (toplot.T / norm).T
+    return toplot
+
+
+def plot_freq_evolv(sim, ax=None, video=False):
+    evolv = fpn.get_2d_evolv(sim.AW)
+
+    if ax is None:
+        fig, ax = plt.subplots(1, 1)
+
+    ax.pcolormesh(sim.pulse.wl_um[ind], (sim.zs * 100.), evolv[:, ind][:, 0, :],
+                  cmap='jet',
+                  shading='auto')
+    ax.set_xlim(1, 2)
+    ax.set_xlabel("$\mathrm{\mu m}$")
+    ax.set_ylabel("cm")
+
+
+def plot_time_evolv(sim, ax=None):
+    if ax is None:
+        fig, ax = plt.subplots(1, 1)
+
+    toplot = get_2d_time_evolv(sim.AT)
+    ax.pcolormesh(sim.pulse.T_ps, (sim.zs * 100.), toplot, cmap='jet',
+                  shading='auto')
+    ax.set_xlim(-1.5, 1.5)
+    ax.set_xlabel("ps")
+    ax.set_ylabel("cm")
+
+
+def video(sim, save=False, figsize=[12.18, 4.8]):
+    awevolv = fpn.get_2d_evolv(sim.AW)
+    atevolv = get_2d_time_evolv(sim.AT)
+
+    if save:
+        plt.ioff()
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize)
+
+    if save:
+        for i in range(len(sim.zs)):
+            ax1.clear()
+            ax2.clear()
+            ax2.set_xlim(1, 2)
+            ax1.set_xlim(-1, 1)
+            ax1.set_xlabel("ps")
+            ax2.set_xlabel("$\mathrm{\mu m}$")
+
+            ax1.plot(sim.pulse.T_ps, atevolv[i])
+            ax2.plot(sim.pulse.wl_um[ind], awevolv[i][ind])
+            fig.suptitle('%.2f' % (sim.zs[i] * 100.))
+            plt.savefig("figuresForVideos/" + str(i) + ".png")
+
+        plt.ion()
+        return
+
+    for i in range(len(sim.zs)):
+        ax1.clear()
+        ax2.clear()
+        ax2.set_xlim(1, 2)
+        ax1.set_xlim(-1, 1)
+        ax1.set_xlabel("ps")
+        ax2.set_xlabel("$\mathrm{\mu m}$")
+
+        ax1.plot(sim.pulse.T_ps, atevolv[i])
+        ax2.plot(sim.pulse.wl_um[ind], awevolv[i][ind])
+        fig.suptitle('%.2f' % (sim.zs[i] * 100.))
+        plt.pause(.1)
+
+
+def create_mp4(fps, name):
+    command = "ffmpeg -r " + \
+              str(fps) + \
+              " -f image2 -s 1920x1080 -y -i figuresForVideos/%d.png " \
+              "-vcodec libx264 -crf 25  -pix_fmt yuv420p " + \
+              name
+    os.system(command)
+
+
+# pulse from Toptica. The pulse retrieved from the time and frequency domain
+# are the same when I plotted them.
 pulse_from_T, pulse_from_W = get_pulse_data()
 
-"""Now let's simulate! The goal is to get an estimate of how much fiber we 
-need. I think we ideally want to splice HNLF to a PM-1550 pigtail, cut back 
-on the HNLF, and then connectorize. Before that, I want to get an estimate of 
-how much broadening we can expect inside PM-1550. At this pulse energy, 
-there should definitely be nonlinearity in PM-1550. """
-
+# fiber Parameters:
 # OFS AD HNLF parameters
 adhnlf = {
     "D": 5.4,
@@ -144,33 +236,73 @@ fiber_pm1550.generate_fiber(.2,
                             gain=dBkm_to_m(pm1550["Alpha"]),
                             dispersion_format="D")
 
-# initialize a simulation instance
-ssfm = fpn.FiberFourWaveMixing()
+###############################################################################
+pulse = pulse_from_W
+ind = np.nonzero(pulse.wl_nm > 0)
 
-# set the pulse energy
-pulse_from_W.set_epp(20.e-9)
-ind = np.nonzero(pulse_from_W.wl_um > 0)
+"""2 Watts 100 MHz (20nJ) """
 
-# go through pm1550 first
-fiber_pm1550.length = 0.2
-res = ssfm.propagate(pulse_from_W, fiber_pm1550, 100)
+# PM1550
+sim_pm1550 = simulate(pulse, fiber_pm1550, length_cm=20., epp_nJ=20.)
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=[12.18, 4.8])
+plot_freq_evolv(sim_pm1550, ax2)
+plot_time_evolv(sim_pm1550, ax1)
+fig.suptitle("PM1550")
+# video(sim_pm1550)
+# create_mp4(15, "PM1550.mp4")
 
-# then go through some hnlf
-pulse_out = res.pulse
-fiber2 = fiber_adhnlf
-fiber2.length = .1
-res2 = ssfm.propagate(pulse_out, fiber2, 100)
+# 3mm PM1550 -> NDHNLF
+sim_3mm_ndhnlf = simulate(
+    pulse=simulate(pulse, fiber_pm1550, length_cm=.3, epp_nJ=20.).pulse,
+    fiber=fiber_ndhnlf,
+    length_cm=8.,
+    epp_nJ=20.
+)
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=[12.18, 4.8])
+plot_freq_evolv(sim_3mm_ndhnlf, ax2)
+plot_time_evolv(sim_3mm_ndhnlf, ax1)
+fig.suptitle("3mm PM1550 -> NDHNLF")
+video(sim_3mm_ndhnlf, True)
+create_mp4(15, "3mm_PM1550_to_NDHNLF.mp4")
 
-# plot the evolution in pm1550
-evolv = fpn.get_2d_evolv(res.AW)
-plt.figure()
-plt.pcolormesh(pulse_from_W.wl_nm[ind] * 1e-3, res.zs, evolv[:, ind][:, 0, :],
-               shading='auto')
-plt.xlim(1, 2)
+# 3mm PM1550 -> adnhnlf
+sim_3mm_adnhnlf = simulate(
+    pulse=simulate(pulse, fiber_pm1550, length_cm=.3, epp_nJ=20.).pulse,
+    fiber=fiber_adhnlf,
+    length_cm=5.,
+    epp_nJ=20.
+)
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=[12.18, 4.8])
+plot_freq_evolv(sim_3mm_adnhnlf, ax2)
+plot_time_evolv(sim_3mm_adnhnlf, ax1)
+fig.suptitle("3mm PM1550 -> ADHNLF")
+video(sim_3mm_adnhnlf, True)
+create_mp4(15, "3mm_PM1550_to_ADHNLF.mp4")
 
-# plot the evolution in hnlf
-evolv = fpn.get_2d_evolv(res2.AW)
-plt.figure()
-plt.pcolormesh(pulse_from_W.wl_nm[ind] * 1e-3, res2.zs, evolv[:, ind][:, 0, :],
-               shading='auto')
-plt.xlim(1, 2)
+# 3cm PM1550 -> NDHNLF
+sim_3cm_ndhnlf = simulate(
+    pulse=simulate(pulse, fiber_pm1550, length_cm=3., epp_nJ=20.).pulse,
+    fiber=fiber_ndhnlf,
+    length_cm=8.,
+    epp_nJ=20.
+)
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=[12.18, 4.8])
+plot_freq_evolv(sim_3cm_ndhnlf, ax2)
+plot_time_evolv(sim_3cm_ndhnlf, ax1)
+fig.suptitle("3cm PM1550 -> NDHNLF")
+video(sim_3cm_ndhnlf, True)
+create_mp4(15, "3cm_PM1550_to_NDHNLF.mp4")
+
+# 3cm PM1550 -> adnhnlf
+sim_3cm_adnhnlf = simulate(
+    pulse=simulate(pulse, fiber_pm1550, length_cm=3., epp_nJ=20.).pulse,
+    fiber=fiber_adhnlf,
+    length_cm=5.,
+    epp_nJ=20.
+)
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=[12.18, 4.8])
+plot_freq_evolv(sim_3cm_adnhnlf, ax2)
+plot_time_evolv(sim_3cm_adnhnlf, ax1)
+fig.suptitle("3cm PM1550 -> ADHNLF")
+video(sim_3cm_adnhnlf, True)
+create_mp4(15, "3cm_PM1550_to_ADHNLF.mp4")
