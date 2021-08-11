@@ -22,15 +22,24 @@ def dBkm_to_m(dBkm):
 
 
 # amplitude and phase data from Toptica
-def get_pulse_data(plot=False):
-    pulse_data = np.genfromtxt("210526_2.0W_pulse.txt", skip_header=1)
+def get_pulse_data(plot=False, time_window_ps=10,
+                   NPTS=2 ** 14, frep_MHz=100.,
+                   EPP_nJ=5., using_notebook=False):
+    if using_notebook:
+        time_path = "../210526_2.0W_pulse.txt"
+        freq_path = "../210526_2.0W_spectrum.txt"
+    else:
+        time_path = "210526_2.0W_pulse.txt"
+        freq_path = "210526_2.0W_spectrum.txt"
+
+    pulse_data = np.genfromtxt(time_path, skip_header=1)
     T_ps = pulse_data[:, 0]
     intensity_T = pulse_data[:, 1]
     phase_T = pulse_data[:, 2]
     amp_T = np.sqrt(intensity_T)
     AT = amp_T * np.exp(1j * phase_T)
 
-    spec_data = np.genfromtxt("210526_2.0W_spectrum.txt", skip_header=1)
+    spec_data = np.genfromtxt(freq_path, skip_header=1)
     wl_nm = spec_data[:, 0]
     intensity_W = spec_data[:, 1]
     phase_W = spec_data[:, 2]
@@ -44,17 +53,17 @@ def get_pulse_data(plot=False):
     center_wavelength_nm = sc.c / func(.5) * 1e9
 
     # pulse from setting electric field in time domain
-    pulse_from_T = fpn.Pulse(time_window_ps=10,
+    pulse_from_T = fpn.Pulse(time_window_ps=time_window_ps,
                              center_wavelength_nm=center_wavelength_nm,
-                             NPTS=2 ** 14, frep_MHz=100.,
-                             EPP_nJ=5.)
+                             NPTS=NPTS, frep_MHz=frep_MHz,
+                             EPP_nJ=EPP_nJ)
     pulse_from_T.set_AT_experiment(T_ps, AT)
 
     # pulse from setting electric field in frequency domain
-    pulse_from_W = fpn.Pulse(time_window_ps=10,
+    pulse_from_W = fpn.Pulse(time_window_ps=time_window_ps,
                              center_wavelength_nm=center_wavelength_nm,
-                             NPTS=2 ** 14, frep_MHz=100.,
-                             EPP_nJ=5.)
+                             NPTS=NPTS, frep_MHz=frep_MHz,
+                             EPP_nJ=EPP_nJ)
     pulse_from_W.set_AW_experiment(wl_nm * 1e-3, AW)
 
     if plot:
@@ -109,8 +118,10 @@ def get_2d_time_evolv(at2d):
     return toplot
 
 
-def plot_freq_evolv(sim, ax=None, video=False):
+def plot_freq_evolv(sim, ax=None, xlims=None):
     evolv = fpn.get_2d_evolv(sim.AW)
+
+    ind = (sim.pulse.wl_um > 0).nonzero()
 
     if ax is None:
         fig, ax = plt.subplots(1, 1)
@@ -118,7 +129,11 @@ def plot_freq_evolv(sim, ax=None, video=False):
     ax.pcolormesh(sim.pulse.wl_um[ind], (sim.zs * 100.), evolv[:, ind][:, 0, :],
                   cmap='jet',
                   shading='auto')
-    ax.set_xlim(1, 2)
+
+    if xlims is None:
+        ax.set_xlim(1, 2)
+    else:
+        ax.set_xlim(*xlims)
     ax.set_xlabel("$\mathrm{\mu m}$")
     ax.set_ylabel("cm")
 
@@ -138,6 +153,8 @@ def plot_time_evolv(sim, ax=None):
 def video(sim, save=False, figsize=[12.18, 4.8]):
     awevolv = fpn.get_2d_evolv(sim.AW)
     atevolv = get_2d_time_evolv(sim.AT)
+
+    ind = (sim.pulse.wl_um > 0).nonzero()
 
     if save:
         plt.ioff()
@@ -183,10 +200,6 @@ def create_mp4(fps, name):
               name
     os.system(command)
 
-
-# pulse from Toptica. The pulse retrieved from the time and frequency domain
-# are the same when I plotted them.
-pulse_from_T, pulse_from_W = get_pulse_data()
 
 # fiber Parameters:
 # OFS AD HNLF parameters
@@ -235,74 +248,3 @@ fiber_pm1550.generate_fiber(.2,
                             pm1550["gamma"] * 1e-3,
                             gain=dBkm_to_m(pm1550["Alpha"]),
                             dispersion_format="D")
-
-###############################################################################
-pulse = pulse_from_W
-ind = np.nonzero(pulse.wl_nm > 0)
-
-"""2 Watts 100 MHz (20nJ) """
-
-# PM1550
-sim_pm1550 = simulate(pulse, fiber_pm1550, length_cm=20., epp_nJ=20.)
-# fig, (ax1, ax2) = plt.subplots(1, 2, figsize=[12.18, 4.8])
-# plot_freq_evolv(sim_pm1550, ax2)
-# plot_time_evolv(sim_pm1550, ax1)
-# fig.suptitle("PM1550")
-# video(sim_pm1550)
-# create_mp4(15, "PM1550.mp4")
-
-# 3mm PM1550 -> NDHNLF
-sim_3mm_ndhnlf = simulate(
-    pulse=simulate(pulse, fiber_pm1550, length_cm=.3, epp_nJ=20.).pulse,
-    fiber=fiber_ndhnlf,
-    length_cm=8.,
-    epp_nJ=20.
-)
-# fig, (ax1, ax2) = plt.subplots(1, 2, figsize=[12.18, 4.8])
-# plot_freq_evolv(sim_3mm_ndhnlf, ax2)
-# plot_time_evolv(sim_3mm_ndhnlf, ax1)
-# fig.suptitle("3mm PM1550 -> NDHNLF")
-# video(sim_3mm_ndhnlf, True)
-# create_mp4(15, "3mm_PM1550_to_NDHNLF.mp4")
-
-# 3mm PM1550 -> adnhnlf
-sim_3mm_adnhnlf = simulate(
-    pulse=simulate(pulse, fiber_pm1550, length_cm=.3, epp_nJ=20.).pulse,
-    fiber=fiber_adhnlf,
-    length_cm=5.,
-    epp_nJ=20.
-)
-# fig, (ax1, ax2) = plt.subplots(1, 2, figsize=[12.18, 4.8])
-# plot_freq_evolv(sim_3mm_adnhnlf, ax2)
-# plot_time_evolv(sim_3mm_adnhnlf, ax1)
-# fig.suptitle("3mm PM1550 -> ADHNLF")
-# video(sim_3mm_adnhnlf, True)
-# create_mp4(15, "3mm_PM1550_to_ADHNLF.mp4")
-
-# 3cm PM1550 -> NDHNLF
-sim_3cm_ndhnlf = simulate(
-    pulse=simulate(pulse, fiber_pm1550, length_cm=3., epp_nJ=20.).pulse,
-    fiber=fiber_ndhnlf,
-    length_cm=8.,
-    epp_nJ=20.
-)
-# fig, (ax1, ax2) = plt.subplots(1, 2, figsize=[12.18, 4.8])
-# plot_freq_evolv(sim_3cm_ndhnlf, ax2)
-# plot_time_evolv(sim_3cm_ndhnlf, ax1)
-# fig.suptitle("3cm PM1550 -> NDHNLF")
-# video(sim_3cm_ndhnlf, True)
-# create_mp4(15, "3cm_PM1550_to_NDHNLF.mp4")
-
-# 3cm PM1550 -> adnhnlf
-sim_3cm_adnhnlf = simulate(
-    pulse=simulate(pulse, fiber_pm1550, length_cm=3., epp_nJ=20.).pulse,
-    fiber=fiber_adhnlf,
-    length_cm=5.,
-    epp_nJ=20.
-)
-# fig, (ax1, ax2) = plt.subplots(1, 2, figsize=[12.18, 4.8])
-# plot_freq_evolv(sim_3cm_adnhnlf, ax2)
-# plot_time_evolv(sim_3cm_adnhnlf, ax1)
-# fig.suptitle("3cm PM1550 -> ADHNLF")
-# video(sim_3cm_adnhnlf, True)
-# create_mp4(15, "3cm_PM1550_to_ADHNLF.mp4")
