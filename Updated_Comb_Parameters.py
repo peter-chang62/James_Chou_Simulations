@@ -12,6 +12,22 @@ def get_window(center_wavelength_nm, window_ghz):
 
 pulse = get_pulse_data(plot=False, frep_MHz=200.0, EPP_nJ=17.0)[1]
 
+# plot the pulse
+fig, ax = plt.subplots(1, 1)
+ind = np.logical_and(pulse.wl_um >= 1.5, pulse.wl_um <= 1.6)
+ax.plot(pulse.wl_um[ind], normalize(abs(pulse.AW[ind]) ** 2))
+ax.set_xlabel("$\mathrm{\mu m}$")
+ax.set_ylabel("a.u")
+fig.suptitle("power spectrum")
+
+phase = np.unwrap(np.arctan2(pulse.AW[ind].imag, pulse.AW[ind].real))
+phase *= 180 / np.pi
+fig, ax = plt.subplots(1, 1)
+fig.suptitle("phase")
+ax.plot(pulse.wl_um[ind], phase)
+ax.set_xlabel("$\mathrm{\mu m}$")
+ax.set_ylabel("degrees")
+
 sim = simulate(pulse=pulse, fiber=fiber_ndhnlf, length_cm=10., epp_nJ=17,
                nsteps=200)
 
