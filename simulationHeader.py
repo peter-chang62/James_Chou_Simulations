@@ -150,7 +150,7 @@ def plot_time_evolv(sim, ax=None):
     ax.set_ylabel("cm")
 
 
-def video(sim, save=False, figsize=[12.18, 4.8]):
+def video(sim, save=False, figsize=[12.18, 4.8], xlims=None):
     awevolv = fpn.get_2d_evolv(sim.AW)
     atevolv = get_2d_time_evolv(sim.AT)
 
@@ -161,11 +161,14 @@ def video(sim, save=False, figsize=[12.18, 4.8]):
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize)
 
+    if xlims is None:
+        xlims = [1.3, 1.9]
+
     if save:
         for i in range(len(sim.zs)):
             ax1.clear()
             ax2.clear()
-            ax2.set_xlim(1, 2)
+            ax2.set_xlim(*xlims)
             ax1.set_xlim(-1, 1)
             ax1.set_xlabel("ps")
             ax2.set_xlabel("$\mathrm{\mu m}$")
@@ -175,13 +178,15 @@ def video(sim, save=False, figsize=[12.18, 4.8]):
             fig.suptitle('%.2f' % (sim.zs[i] * 100.))
             plt.savefig("figuresForVideos/" + str(i) + ".png")
 
+            print(str(i + 1) + "/" + str(len(sim.zs)))
+
         plt.ion()
         return
 
     for i in range(len(sim.zs)):
         ax1.clear()
         ax2.clear()
-        ax2.set_xlim(1, 2)
+        ax2.set_xlim(*xlims)
         ax1.set_xlim(-1, 1)
         ax1.set_xlabel("ps")
         ax2.set_xlabel("$\mathrm{\mu m}$")
