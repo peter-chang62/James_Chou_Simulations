@@ -34,7 +34,7 @@ def plot_sim_at_z(sim, z_cm, ax=None, label=None):
 # %%
 pulse = get_pulse_data()[1]
 
-# 1.7 W at 200 MHz is 17/2 nJ
+# 1.752 W at 200 MHz is 17.52/2 nJ
 # They had 45% coupling efficiency
 sim = simulate(pulse=pulse, fiber=fiber_ndhnlf, length_cm=6., epp_nJ=17.52 * 0.5 * 0.45, nsteps=400)
 
@@ -87,13 +87,14 @@ for n, aw in enumerate(sim.AW):
 error_mean = np.mean(error, axis=1)
 best_ind = np.argmin(error_mean)
 
-fig, ax = plt.subplots(2, 2)
+fig, ax = plt.subplots(2, 2, figsize=np.array([13.78,  6.82]))
 [i.set_xlim(*wl_um[[0, -1]]) for i in ax.flatten()]
 ax[0, 0].plot(pulse.wl_um[ind], normalize(abs(pulse.AW[ind]) ** 2), label='input spectrum')
 ax[0, 1].plot(wl_um, normalize(spectrum), label='data')
-ax[0, 1].plot(pulse.wl_um[ind], normalize(abs(sim.AW[best_ind][ind]) ** 2), label='%.2f' % (sim.zs[best_ind] * 100))
+ax[0, 1].plot(pulse.wl_um[ind], normalize(abs(sim.AW[best_ind][ind]) ** 2), label='%.2f' % (sim.zs[best_ind] * 100)
+                                                                                  + " cm")
 ax[1, 0].plot(wl_um, normalize(spectrum), label='data')
-plot_sim_at_z(sim, 4.5, ax[1, 0], label='4.5')
+plot_sim_at_z(sim, 4.5, ax[1, 0], label='4.5 cm')
 ax[1, 1].plot(wl_um, normalize(spectrum), label='data')
-plot_sim_at_z(sim, 6, ax[1, 1], label='6')
+plot_sim_at_z(sim, 6, ax[1, 1], label='6 cm')
 [i.legend(loc='best') for i in ax.flatten()]
