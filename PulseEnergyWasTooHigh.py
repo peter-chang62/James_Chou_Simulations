@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import clipboard_and_style_sheet
 from simulationHeader import *
 from scipy.interpolate import interp1d
+from scipy.integrate import simps
 
 clipboard_and_style_sheet.style_sheet()
 
@@ -36,48 +37,69 @@ pulse = get_pulse_data()[1]
 
 # 1.752 W at 200 MHz is 17.52/2 nJ
 # They had 45% coupling efficiency
-sim = simulate(pulse=pulse, fiber=fiber_ndhnlf, length_cm=6., epp_nJ=17.52 * 0.5 * 0.45, nsteps=400)
+sim = simulate(pulse=pulse, fiber=fiber_ndhnlf, length_cm=8., epp_nJ=17.52 * 0.5 * 0.45, nsteps=200)
 
 # %%
-# # suppose you use a 100 GHz pass band around 1.45 micron
-# ll_um, ul_um = get_window(center_wavelength_nm=1450., window_ghz=100.)
+# suppose you use a 100 GHz pass band around 1.45 micron
+ll_um, ul_um = get_window(center_wavelength_nm=1450., window_ghz=100.)
 
-# # get the power evolution around 1.45 micron, with a 100 GHz passband
-# power = fpn.power_in_window(pulse, sim.AW, ll_um, ul_um, 200) * 1e3
+# get the power evolution around 1.45 micron, with a 100 GHz passband
+power = fpn.power_in_window(pulse, sim.AW, ll_um, ul_um, 200) * 1e3
 
-# # plot the power evolution
-# fig, ax = plt.subplots(1, 1)
-# ax.plot((sim.zs * 1e2), power, '.')
-# ax.set_xlabel("cm")
-# ax.set_ylabel("mW")
-
-# %%
-# # get the spectrum at the "best" point
-# best_ind = np.argmax(power)
-# AW_best = sim.AW[best_ind]
-
-# # plot the spectrum at the "best" point
-# ind = (pulse.wl_um > 0).nonzero()
-# fig, ax = plt.subplots(1, 1)
-# ax.plot(pulse.wl_um[ind], normalize(abs(AW_best[ind]) ** 2))
-# ax.set_xlim(1.4, 1.7)
+# plot the power evolution
+fig, ax = plt.subplots(1, 1)
+ax.plot((sim.zs * 1e2), power, '.')
+ax.set_xlabel("cm")
+ax.set_ylabel("mW")
 
 # %%
-# # 2D plots
+# get the spectrum at the "best" point
+best_ind = np.argmax(power)
+AW_best = sim.AW[best_ind]
+
+# plot the spectrum at the "best" point
+ind = (pulse.wl_um > 0).nonzero()
+fig, ax = plt.subplots(1, 1)
+ax.plot(pulse.wl_um[ind], normalize(abs(AW_best[ind]) ** 2))
+ax.set_xlim(1.4, 1.7)
+
+
+# %%
+# 2D plots
 # fig, (ax1, ax2) = plt.subplots(1, 2, figsize=[12.18, 4.8])
 # plot_freq_evolv(sim, ax1, xlims=[1.3, 1.8])
 # plot_time_evolv(sim, ax2)
 # plt.savefig("45_percent_coupling_ndhnlf.png")
 
-# %% New Data
-after_ndhnlf_exp = np.genfromtxt("after_4.5_cm_ndhnlf_toptica.txt")
-wl_um = after_ndhnlf_exp[:, 0] * 1e-3
-spectrum = after_ndhnlf_exp[:, 1]
+# %% New Data, convert from psd to power
+def df(f0):
+    c = sc.c
+    dl = 1.0e-9
+    return (- c + np.sqrt(c ** 2 + dl ** 2 * f0 ** 2)) / dl
 
+
+data = np.genfromtxt("after_4.5_cm_ndhnlf_toptica.txt")
+
+wl = data[:, 0] * 1e-9
+F = sc.c / wl
+psd_uW_nm = data[:, 1]
+
+gridded_psd_uW_nm = interp1d(F, psd_uW_nm, bounds_error=True)
+
+ind = np.logical_and(F > F[-1] + df(F[-1]), F < F[0] - df(F[0])).nonzero()[0]
+spectrum = np.zeros(len(psd_uW_nm))
+for n in range(ind[0], ind[-1]):
+    dF = df(F[n])
+    f = np.linspace(F[n] - dF, F[n] + dF, 5000)
+    spectrum[n] = simps(gridded_psd_uW_nm(f))
+
+spectrum = normalize(spectrum)
+
+# %% find best matching simulation spectrum
+wl_um = wl * 1e6
 gridded = interp1d(wl_um, spectrum, bounds_error=True)
 ind = np.logical_and(pulse.wl_um >= wl_um[0], pulse.wl_um <= wl_um[-1]).nonzero()[0]
 gridded_spectrum = gridded(pulse.wl_um[ind])
-gridded_spectrum = normalize(gridded_spectrum)
 
 error = np.zeros((len(sim.AW), len(pulse.wl_um[ind])))
 for n, aw in enumerate(sim.AW):
@@ -87,7 +109,7 @@ for n, aw in enumerate(sim.AW):
 error_mean = np.mean(error, axis=1)
 best_ind = np.argmin(error_mean)
 
-fig, ax = plt.subplots(2, 2, figsize=np.array([13.78,  6.82]))
+fig, ax = plt.subplots(2, 2, figsize=np.array([13.78, 6.82]))
 [i.set_xlim(*wl_um[[0, -1]]) for i in ax.flatten()]
 ax[0, 0].plot(pulse.wl_um[ind], normalize(abs(pulse.AW[ind]) ** 2), label='input spectrum')
 ax[0, 1].plot(wl_um, normalize(spectrum), label='data')
