@@ -10,8 +10,6 @@ import clipboard_and_style_sheet
 import scipy.constants as sc
 import scipy.interpolate as spi
 
-clipboard_and_style_sheet.style_sheet()
-
 normalize = lambda vec: vec / np.max(abs(vec))
 
 
@@ -208,9 +206,17 @@ def create_mp4(fps, name):
 
 # fiber Parameters:
 # OFS AD HNLF parameters
+# adhnlf = {
+#     "D": 5.4,
+#     "Dprime": 0.028,
+#     "gamma": 10.9,
+#     "Alpha": 0.74,
+# }
+
+# Pooja said that these matched her experimental results better
 adhnlf = {
-    "D": 5.4,
-    "Dprime": 0.028,
+    "D": 4.88,
+    "Dprime": 0.0228,
     "gamma": 10.9,
     "Alpha": 0.74,
 }
