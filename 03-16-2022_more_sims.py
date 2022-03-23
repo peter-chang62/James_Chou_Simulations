@@ -19,7 +19,7 @@ def get_window(center_wavelength_nm, window_ghz):
 
 # %%
 pulse = sh.get_pulse_data()[1]
-coupling_efficiency = 0.8
+coupling_efficiency = 0.7
 epp = 17.0 * 0.5 * coupling_efficiency
 
 # %%
@@ -32,7 +32,7 @@ sim = sh.simulate(pulse=sim_pm1550.pulse, fiber=sh.fiber_adhnlf, length_cm=5.0, 
                   nsteps=200)
 
 # %%
-ll_um, ul_um = get_window(1450, 100)
+ll_um, ul_um = 1.45 - .005, 1.45 + .005
 power = fpn.power_in_window(pulse, sim.AW, ll_um, ul_um, 200)
 
 # %%
