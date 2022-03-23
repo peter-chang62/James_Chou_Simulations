@@ -4,6 +4,7 @@ import simulationHeader as sh
 import clipboard_and_style_sheet
 import scipy.constants as sc
 import pynlo_peter.Fiber_PPLN_NLSE as fpn
+import pandas as pd
 
 clipboard_and_style_sheet.style_sheet()
 
@@ -48,3 +49,13 @@ fig, ax = plt.subplots(1, 1)
 ax.plot(sim.zs * 1e2 + length_pm1550, power * 1e3, '.')
 ax.set_xlabel("distance (cm)")
 ax.set_ylabel("power (mW)")
+
+# %%
+spec = sim.AW.__abs__() ** 2
+F_THz = sim.pulse.F_THz
+ind = (F_THz > 0).nonzero()[0]
+zs = sim.zs * 1e2 + length_pm1550
+
+spec = spec[:, ind]
+F_THz = F_THz[ind]
+frame = pd.DataFrame(data=spec, index=zs, columns=F_THz)
