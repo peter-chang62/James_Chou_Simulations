@@ -28,25 +28,25 @@ pulse = fpn.Pulse(
 
 # %% ___________________________________________________________________________________________________________________
 # set power spectrum to a flat top
-epp = pulse.calc_epp()
-AW = pulse.AW.copy()
-ind_ll = np.argmin(abs(pulse.F_THz - fthz_ll))
-ind_ul = np.argmin(abs(pulse.F_THz - fthz_ul))
-AW[ind_ll:ind_ul] = 1.
-AW[:ind_ll] = 0
-AW[ind_ul:] = 0
-pulse.set_AW(AW)
-pulse.set_epp(epp)
+# epp = pulse.calc_epp()
+# AW = pulse.AW.copy()
+# ind_ll = np.argmin(abs(pulse.F_THz - fthz_ll))
+# ind_ul = np.argmin(abs(pulse.F_THz - fthz_ul))
+# AW[ind_ll:ind_ul] = 1.
+# AW[:ind_ll] = 0
+# AW[ind_ul:] = 0
+# pulse.set_AW(AW)
+# pulse.set_epp(epp)
 
 # %% ___________________________________________________________________________________________________________________
 # pulse energy
 factor = 10
-power_mw = 13
+power_mw = 20
 epp_nJ = power_mw * 1e-3 * factor
 
 # %% ___________________________________________________________________________________________________________________
 sim = sh.simulate(pulse, sh.fiber_pm1550,
-                  length_cm=3000,
+                  length_cm=1000,
                   epp_nJ=epp_nJ,
                   nsteps=1000)
 
