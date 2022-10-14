@@ -132,8 +132,8 @@ def plot_freq_evolv(sim, ax=None, xlims=None):
         ax.set_xlim(1, 2)
     else:
         ax.set_xlim(*xlims)
-    ax.set_xlabel("$\mathrm{\mu m}$")
-    ax.set_ylabel("cm")
+    ax.set_xlabel("wavelength ($\mathrm{\mu m}$)")
+    ax.set_ylabel("propagation distance (cm)")
 
 
 def plot_time_evolv(sim, ax=None):
@@ -144,8 +144,8 @@ def plot_time_evolv(sim, ax=None):
     ax.pcolormesh(sim.pulse.T_ps, (sim.zs * 100.), toplot, cmap='jet',
                   shading='auto')
     ax.set_xlim(-1.5, 1.5)
-    ax.set_xlabel("ps")
-    ax.set_ylabel("cm")
+    ax.set_xlabel("time (ps)")
+    ax.set_ylabel("propagation distance (cm)")
 
 
 def video(sim, save=False, figsize=[12.18, 4.8], xlims=None):
