@@ -44,7 +44,7 @@ max_wl = 3e-6
 center_wl = 1550e-9
 t_fwhm = 50e-15
 time_window = 10e-12
-e_p = 17e-9 / 2 * 0.6768
+e_p = 17.3e-9 / 2 * 0.68
 
 pulse = pe.light.Pulse.Sech(
     n_points,
@@ -58,12 +58,38 @@ pulse = pe.light.Pulse.Sech(
 file = tables.open_file("210526_2.0W_pulse.h5", "r")
 pulse.import_p_v(file.root.v_grid[:], file.root.p_v[:], phi_v=file.root.phi_v[:])
 
-# %%
-t_grid = np.arange(-750e-15, 750e-15, 1e-15)
-v_grid, spctgm = pulse.calculate_spectrogram(t_grid)
+# %% -----
+# t_grid = np.arange(-750e-15, 750e-15, 1e-15)
+# v_grid, spctgm = pulse.calculate_spectrogram(t_grid)
 
-fig_spctgm, ax_spctgm = plt.subplots(1, 1)
-ax_spctgm.pcolormesh(t_grid * 1e15, c * 1e6 / v_grid, spctgm.T, cmap="cividis")
-ax_spctgm.set_ylim(1.49, 1.62)
-ax_spctgm.set_xlabel("time (fs)")
-ax_spctgm.set_ylabel("wavelength ($\\mathrm{\\mu m}$)")
+# fig_spctgm, ax_spctgm = plt.subplots(1, 1)
+# ax_spctgm.pcolormesh(t_grid * 1e15, c * 1e6 / v_grid, spctgm.T, cmap="cividis")
+# ax_spctgm.set_ylim(1.49, 1.62)
+# ax_spctgm.set_xlabel("time (fs)")
+# ax_spctgm.set_ylabel("wavelength ($\\mathrm{\\mu m}$)")
+
+# %% --------------------------------------------------------------------------
+hnlf = pe.materials.Fiber()
+pm1550 = pe.materials.Fiber()
+pm1550.load_fiber_from_dict(pe.materials.pm1550, axis="slow")
+# hnlf.load_fiber_from_dict(pe.materials.hnlf_5p7_pooja, axis="slow")
+hnlf.load_fiber_from_dict(pe.materials.hnlf_2p2, axis="slow")
+
+model_pm1550 = pm1550.generate_model(pulse)
+dz = pe.utilities.estimate_step_size(model_pm1550, local_error=1e-6)
+result_pm1550 = model_pm1550.simulate(
+    5.5e-2, dz=dz, local_error=1e-6, n_records=100, plot=None
+)
+
+model_hnlf = hnlf.generate_model(result_pm1550.pulse_out, t_shock=None)
+dz = pe.utilities.estimate_step_size(model_hnlf, local_error=1e-6)
+result_hnlf = model_hnlf.simulate(
+    10e-2, dz=dz, local_error=1e-6, n_records=200, plot=None
+)
+
+result_hnlf.plot("wvl")
+
+# %%
+fig, ax = plt.subplots(1, 1)
+ax.pcolormesh(pulse.wl_grid * 1e6, result_hnlf.z, result_hnlf.p_v, cmap='jet')
+ax.set_xlim(1, 2)
