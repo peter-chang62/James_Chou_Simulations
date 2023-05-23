@@ -4,6 +4,8 @@ import numpy as np
 import clipboard_and_style_sheet as cr
 import tables
 import pynlo_extras as pe
+from scipy.integrate import simpson
+
 
 # %% --------------------------------------------------------------------------
 # c = 299792458.0
@@ -72,24 +74,57 @@ pulse.import_p_v(file.root.v_grid[:], file.root.p_v[:], phi_v=file.root.phi_v[:]
 hnlf = pe.materials.Fiber()
 pm1550 = pe.materials.Fiber()
 pm1550.load_fiber_from_dict(pe.materials.pm1550, axis="slow")
-# hnlf.load_fiber_from_dict(pe.materials.hnlf_5p7_pooja, axis="slow")
-hnlf.load_fiber_from_dict(pe.materials.hnlf_2p2, axis="slow")
+hnlf.load_fiber_from_dict(pe.materials.hnlf_5p7_pooja, axis="slow")
 
 model_pm1550 = pm1550.generate_model(pulse)
 dz = pe.utilities.estimate_step_size(model_pm1550, local_error=1e-6)
 result_pm1550 = model_pm1550.simulate(
-    5.5e-2, dz=dz, local_error=1e-6, n_records=100, plot=None
+    5.5e-2,
+    dz=dz,
+    local_error=1e-6,
+    n_records=250,
+    plot=None,
 )
 
 model_hnlf = hnlf.generate_model(result_pm1550.pulse_out, t_shock=None)
 dz = pe.utilities.estimate_step_size(model_hnlf, local_error=1e-6)
 result_hnlf = model_hnlf.simulate(
-    10e-2, dz=dz, local_error=1e-6, n_records=200, plot=None
+    5e-2,
+    dz=dz,
+    local_error=1e-6,
+    n_records=250,
+    plot=None,
 )
 
-result_hnlf.plot("wvl")
+# %% ----- plotting
+fig, ax = result_hnlf.plot("wvl")
+ax[1, 0].axhline(20, color="C2", linestyle="--")
 
-# %%
+ind_end = np.argmin(abs(result_hnlf.z - 0.02))
+norm = result_hnlf.p_v[ind_end].max()
 fig, ax = plt.subplots(1, 1)
-ax.pcolormesh(pulse.wl_grid * 1e6, result_hnlf.z, result_hnlf.p_v, cmap='jet')
-ax.set_xlim(1, 2)
+ax.semilogy(pulse.wl_grid * 1e6, result_hnlf.p_v[ind_end] / norm)
+ax.set_ylim(ymin=1e-2)
+ax.set_xlim(1.2, 1.9)
+ax.set_xlabel("wavelength ($\\mathrm{\\mu m}$)")
+
+# %% ----- power @ 1450 and 1800 nm
+p_v_out = result_hnlf.p_v[ind_end]
+
+# 10 nm bandpasses around 1450 and 1800 nm
+(ind_1450_10nm,) = np.logical_and(
+    (1450 - 5) < pulse.wl_grid * 1e9, pulse.wl_grid * 1e9 < (1450 + 5)
+).nonzero()
+
+
+(ind_1800_10nm,) = np.logical_and(
+    (1800 - 5) < pulse.wl_grid * 1e9, pulse.wl_grid * 1e9 < (1800 + 5)
+).nonzero()
+
+pwr_1450 = simpson(p_v_out[ind_1450_10nm], pulse.v_grid[ind_1450_10nm]) * 200e6 * 1e3
+pwr_1800 = simpson(p_v_out[ind_1800_10nm], pulse.v_grid[ind_1800_10nm]) * 200e6 * 1e3
+
+# %% ----- compare against the figure I emailed to April
+# fig, ax = plt.subplots(1, 1)
+# ax.pcolormesh(pulse.wl_grid * 1e6, result_hnlf.z, result_hnlf.p_v, cmap="jet")
+# ax.set_xlim(1, 2)
