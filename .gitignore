@@ -3,3 +3,7 @@
 
 __pycache__/
 /~$Simulations_for_Yu_Liu.pptx
+
+fig/
+
+.DS_Store
