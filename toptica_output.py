@@ -7,6 +7,7 @@ import pynlo_extras as pe
 from scipy.integrate import simpson
 import copy
 from tqdm import tqdm
+import matplotlib
 
 
 # %% --------------------------------------------------------------------------
@@ -128,12 +129,12 @@ result_hnlf = model_hnlf.simulate(
     (1450 - 25) < pulse.wl_grid * 1e9, pulse.wl_grid * 1e9 < (1450 + 25)
 ).nonzero()
 
-(ind_1800_25nm,) = np.logical_and(
-    (1800 - 12.5) < pulse.wl_grid * 1e9, pulse.wl_grid * 1e9 < (1800 + 12.5)
+(ind_1770_25nm,) = np.logical_and(
+    (1770 - 12.5) < pulse.wl_grid * 1e9, pulse.wl_grid * 1e9 < (1770 + 12.5)
 ).nonzero()
 
-(ind_1800_50nm,) = np.logical_and(
-    (1800 - 25) < pulse.wl_grid * 1e9, pulse.wl_grid * 1e9 < (1800 + 25)
+(ind_1770_50nm,) = np.logical_and(
+    (1770 - 25) < pulse.wl_grid * 1e9, pulse.wl_grid * 1e9 < (1770 + 25)
 ).nonzero()
 
 (ind_1700nm_lp,) = (pulse.wl_grid * 1e9 > 1700).nonzero()
@@ -150,12 +151,12 @@ pwr_1450_50nm = (
 
 pwr_1700_lp = simpson(p_v[:, ind_1700nm_lp], pulse.v_grid[ind_1700nm_lp]) * 200e6 * 1e3
 
-pwr_1800_25nm = (
-    simpson(p_v[:, ind_1800_25nm], pulse.v_grid[ind_1800_25nm]) * 200e6 * 1e3
+pwr_1770_25nm = (
+    simpson(p_v[:, ind_1770_25nm], pulse.v_grid[ind_1770_25nm]) * 200e6 * 1e3
 )
 
-pwr_1800_50nm = (
-    simpson(p_v[:, ind_1800_50nm], pulse.v_grid[ind_1800_50nm]) * 200e6 * 1e3
+pwr_1770_50nm = (
+    simpson(p_v[:, ind_1770_50nm], pulse.v_grid[ind_1770_50nm]) * 200e6 * 1e3
 )
 
 # %% ----- plotting
@@ -197,10 +198,13 @@ ax_pwr.semilogy(result_hnlf.z * 1e3, pwr_1450_25nm, label="25 nm @ 1450", linewi
 ax_pwr.semilogy(result_hnlf.z * 1e3, pwr_1450_50nm, label="50 nm @ 1450", linewidth=2)
 ax_pwr.semilogy(result_hnlf.z * 1e3, pwr_1700_lp, label="1700 LP", linewidth=2)
 ax_pwr.semilogy(
-    result_hnlf.z * 1e3, pwr_1800_25nm, label="25 nm @ 1800 nm", linewidth=2
+    result_hnlf.z * 1e3, pwr_1770_25nm, label="25 nm @ 1770 nm", linewidth=2
 )
+# ax_pwr.semilogy(
+#     result_hnlf.z * 1e3, pwr_1800_25nm, label="25 nm @ 1800 nm", linewidth=2
+# )
 ax_pwr.semilogy(
-    result_hnlf.z * 1e3, pwr_1800_50nm, label="50 nm @ 1800 nm", linewidth=2
+    result_hnlf.z * 1e3, pwr_1770_50nm, label="50 nm @ 1770 nm", linewidth=2
 )
 ax_pwr.set_xlabel("z (mm)")
 ax_pwr.set_ylabel("power (mW)")
@@ -208,24 +212,62 @@ ax_pwr.legend(loc="best")
 ax_pwr.set_ylim(ymin=10**-1)
 fig_pwr.tight_layout()
 
+# they would like to know the power spectral density at 1770 nm
+p_v_wl = result_hnlf.p_v * model_hnlf.dv_dl  # J / m
+p_v_wl *= 200e6 * 1e3 * 1e-9  # power / nm
+step = int(np.round(1e-3 / np.diff(result_hnlf.z)[0]))
+(ind,) = np.logical_and(result_hnlf.z > 20e-3, result_hnlf.z < 36e-3).nonzero()
+subset = p_v_wl[ind][::step]
+cmap = matplotlib.colormaps["Reds"]
+colors = cmap(np.linspace(0.25, 1, len(subset)))
+
+fig_psd, ax_psd = plt.subplots(1, 1)
+(ind,) = np.logical_and(pulse.wl_grid > 1.7e-6, pulse.wl_grid < 1.85e-6).nonzero()
+[
+    ax_psd.semilogy(pulse.wl_grid[ind] * 1e6, i[ind], color=colors[n])
+    for n, i in enumerate(subset)
+]
+ax_psd.set_xlabel("wavelength ($\\mathrm{\\mu m}$)")
+ax_psd.set_ylabel("power spectral density (mW / nm)")
+fig_psd.tight_layout()
+
+ax_pwr.axvline(20, color=colors[0], linestyle="--")
+ax_pwr.axvline(36, color=colors[-1], linestyle="--")
+
+# ax_psd.pcolormesh(
+#     pulse.wl_grid[ind_1770_25nm] * 1e6,
+#     result_hnlf.z * 1e3,
+#     result_hnlf.p_v[:, ind_1770_25nm],
+# )
+
 # %% ----- compare against the figure I emailed to April
 # fig, ax = plt.subplots(1, 1)
 # ax.pcolormesh(pulse.wl_grid * 1e6, result_hnlf.z, result_hnlf.p_v, cmap="jet")
 # ax.set_xlim(1, 2)
 
 # %% ----- compare to experimental spectrum from April
+hnlf_2p2 = pe.materials.Fiber()
+hnlf_2p2.load_fiber_from_dict(pe.materials.hnlf_2p2, axis="slow")  # normal
+model_hnlf_2p2 = hnlf_2p2.generate_model(pulse, t_shock=None)  # directly into hnlf
+dz = pe.utilities.estimate_step_size(model_hnlf_2p2, local_error=1e-6)
+result_hnlf_2p2 = model_hnlf_2p2.simulate(
+    5e-2,
+    dz=dz,
+    local_error=1e-6,
+    n_records=250,
+    plot=None,
+)
+
 pulse_data = copy.deepcopy(pulse)
 file = tables.open_file("expeirmental_spectrum.h5")
 pulse_data.import_p_v(file.root.v_grid[:], file.root.p_v[:], phi_v=None)
 file.close()
 
-# result_hnlf.animate("wvl", save=True, p_ref=pulse_data)
-
 # %% -----
 # fig, ax = plt.subplots(1, 1)
 # norm = pulse_data.p_v.max()
 # save = True
-# for n, i in enumerate(tqdm(result_hnlf.p_v)):
+# for n, i in enumerate(tqdm(result_hnlf_2p2.p_v)):
 #     ax.clear()
 #     ax.semilogy(pulse_data.wl_grid * 1e6, pulse_data.p_v / norm, label="experimental")
 #     ax.semilogy(pulse_data.wl_grid * 1e6, i / norm, label="simulated")
@@ -234,23 +276,24 @@ file.close()
 #     ax.set_xlabel("wavelength ($\\mathrm{\\mu m}$)")
 #     ax.set_ylabel("power spectral density (a.u.)")
 #     ax.legend(loc="best")
-#     ax.set_title(f"{np.round(result_hnlf.z[n] * 1e3, 2)} mm")
+#     ax.set_title(f"{np.round(result_hnlf_2p2.z[n] * 1e3, 2)} mm")
 #     fig.tight_layout()
 #     if save:
 #         plt.savefig(f"fig/{n}.png", transparent=True, dpi=300)
 #     else:
 #         plt.pause(0.05)
 
-ind_best = np.sum(abs(result_hnlf.p_v - pulse_data.p_v), axis=1).argmin()
+# %% -----
+ind_best = np.sum(abs(result_hnlf_2p2.p_v - pulse_data.p_v), axis=1).argmin()
 fig, ax = plt.subplots(2, 1)
 norm = pulse_data.p_v.max()
 ax[0].semilogy(pulse_data.wl_grid * 1e6, pulse_data.p_v / norm, label="experimental")
 ax[0].semilogy(
-    pulse_data.wl_grid * 1e6, result_hnlf.p_v[ind_best] / norm, label="simulated"
+    pulse_data.wl_grid * 1e6, result_hnlf_2p2.p_v[ind_best] / norm, label="simulated"
 )
 ax[1].plot(pulse_data.wl_grid * 1e6, pulse_data.p_v / norm, label="experimental")
 ax[1].plot(
-    pulse_data.wl_grid * 1e6, result_hnlf.p_v[ind_best] / norm, label="simulated"
+    pulse_data.wl_grid * 1e6, result_hnlf_2p2.p_v[ind_best] / norm, label="simulated"
 )
 ax[0].set_ylim(1e-3, 1.5)
 ax[0].set_xlim(1.3892, 1.7096)
@@ -261,5 +304,5 @@ ax[1].set_xlim(1.3892, 1.7096)
 ax[1].set_xlabel("wavelength ($\\mathrm{\\mu m}$)")
 ax[1].set_ylabel("power spectral density (a.u.)")
 ax[1].legend(loc="best")
-fig.suptitle(f"{np.round(result_hnlf.z[ind_best] * 1e3, 2)} mm")
+fig.suptitle(f"{np.round(result_hnlf_2p2.z[ind_best] * 1e3, 2)} mm")
 fig.tight_layout()
