@@ -94,7 +94,6 @@ file.close()
 hnlf = pe.materials.Fiber()
 pm1550 = pe.materials.Fiber()
 pm1550.load_fiber_from_dict(pe.materials.pm1550, axis="slow")
-# hnlf.load_fiber_from_dict(pe.materials.hnlf_2p2, axis="slow")  # normal
 hnlf.load_fiber_from_dict(pe.materials.hnlf_5p7_pooja, axis="slow")  # anomalous
 
 model_pm1550 = pm1550.generate_model(pulse)
@@ -108,7 +107,6 @@ result_pm1550 = model_pm1550.simulate(
 )
 
 model_hnlf = hnlf.generate_model(result_pm1550.pulse_out, t_shock=None)
-# model_hnlf = hnlf.generate_model(pulse, t_shock=None)  # directly into hnlf
 dz = pe.utilities.estimate_step_size(model_hnlf, local_error=1e-6)
 result_hnlf = model_hnlf.simulate(
     5e-2,
@@ -119,8 +117,6 @@ result_hnlf = model_hnlf.simulate(
 )
 
 # %% ----- power throughout
-# bandpasses around 1450 and 1800 nm
-
 (ind_1450_25nm,) = np.logical_and(
     (1450 - 12.5) < pulse.wl_grid * 1e9, pulse.wl_grid * 1e9 < (1450 + 12.5)
 ).nonzero()
@@ -200,9 +196,6 @@ ax_pwr.semilogy(result_hnlf.z * 1e3, pwr_1700_lp, label="1700 LP", linewidth=2)
 ax_pwr.semilogy(
     result_hnlf.z * 1e3, pwr_1770_25nm, label="25 nm @ 1770 nm", linewidth=2
 )
-# ax_pwr.semilogy(
-#     result_hnlf.z * 1e3, pwr_1800_25nm, label="25 nm @ 1800 nm", linewidth=2
-# )
 ax_pwr.semilogy(
     result_hnlf.z * 1e3, pwr_1770_50nm, label="50 nm @ 1770 nm", linewidth=2
 )
@@ -233,12 +226,6 @@ fig_psd.tight_layout()
 
 ax_pwr.axvline(20, color=colors[0], linestyle="--")
 ax_pwr.axvline(36, color=colors[-1], linestyle="--")
-
-# ax_psd.pcolormesh(
-#     pulse.wl_grid[ind_1770_25nm] * 1e6,
-#     result_hnlf.z * 1e3,
-#     result_hnlf.p_v[:, ind_1770_25nm],
-# )
 
 # %% ----- compare against the figure I emailed to April
 # fig, ax = plt.subplots(1, 1)
