@@ -1,12 +1,11 @@
 # %% ----- package imports
 import matplotlib.pyplot as plt
 import numpy as np
-import clipboard_and_style_sheet as cr
+import clipboard as cr
 import tables
-import pynlo_extras as pe
+import pynlo
 from scipy.integrate import simpson
 import copy
-from tqdm import tqdm
 import matplotlib
 
 
@@ -66,7 +65,7 @@ time_window = 10e-12
 # e_p = 1.73e-9 * 10 / 2 * 0.68
 e_p = 0.85e-9 * 10 / 2
 
-pulse = pe.light.Pulse.Sech(
+pulse = pynlo.light.Pulse.Sech(
     n_points,
     c / max_wl,
     c / min_wl,
@@ -91,28 +90,28 @@ file.close()
 
 # %% --------------------------------------------------------------------------
 # fibers
-hnlf = pe.materials.Fiber()
-pm1550 = pe.materials.Fiber()
-pm1550.load_fiber_from_dict(pe.materials.pm1550, axis="slow")
-hnlf.load_fiber_from_dict(pe.materials.hnlf_5p7_pooja, axis="slow")  # anomalous
+hnlf = pynlo.materials.SilicaFiber()
+pm1550 = pynlo.materials.SilicaFiber()
+pm1550.load_fiber_from_dict(pynlo.materials.pm1550, axis="slow")
+hnlf.load_fiber_from_dict(pynlo.materials.hnlf_5p7_pooja, axis="slow")  # anomalous
 
 model_pm1550 = pm1550.generate_model(pulse)
-dz = pe.utilities.estimate_step_size(model_pm1550, local_error=1e-6)
+dz = model_pm1550.estimate_step_size()
 result_pm1550 = model_pm1550.simulate(
     5.5e-2,
     dz=dz,
     local_error=1e-6,
-    n_records=250,
+    n_records=100,
     plot=None,
 )
 
 model_hnlf = hnlf.generate_model(result_pm1550.pulse_out, t_shock=None)
-dz = pe.utilities.estimate_step_size(model_hnlf, local_error=1e-6)
+dz = model_hnlf.estimate_step_size()
 result_hnlf = model_hnlf.simulate(
     5e-2,
     dz=dz,
     local_error=1e-6,
-    n_records=250,
+    n_records=100,
     plot=None,
 )
 
@@ -233,15 +232,15 @@ ax_pwr.axvline(36, color=colors[-1], linestyle="--")
 # ax.set_xlim(1, 2)
 
 # %% ----- compare to experimental spectrum from April
-hnlf_2p2 = pe.materials.Fiber()
-hnlf_2p2.load_fiber_from_dict(pe.materials.hnlf_2p2, axis="slow")  # normal
+hnlf_2p2 = pynlo.materials.SilicaFiber()
+hnlf_2p2.load_fiber_from_dict(pynlo.materials.hnlf_2p2, axis="slow")  # normal
 model_hnlf_2p2 = hnlf_2p2.generate_model(pulse, t_shock=None)  # directly into hnlf
-dz = pe.utilities.estimate_step_size(model_hnlf_2p2, local_error=1e-6)
+dz = model_hnlf_2p2.estimate_step_size()
 result_hnlf_2p2 = model_hnlf_2p2.simulate(
     5e-2,
     dz=dz,
     local_error=1e-6,
-    n_records=250,
+    n_records=100,
     plot=None,
 )
 
